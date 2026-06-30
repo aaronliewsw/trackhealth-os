@@ -63,7 +63,9 @@ cd trackhealth-os
 cp .env.example .env
 
 # 3. Generate an encryption key and put it in .env as TH_ENC_KEY
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+#    (stdlib only — nothing to install; or use the openssl line below)
+python3 -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+#    no Python? ->  openssl rand -base64 32 | tr '+/' '-_'
 #   -> paste the output as TH_ENC_KEY=... in .env
 
 # 4. Run it
@@ -85,7 +87,7 @@ All config is via environment variables (see `.env.example`):
 | `TH_ENC_KEY` | *(required)* | Fernet key that encrypts the stored Garmin token. Generate with the one-liner above. Lose it → just reconnect. |
 | `TH_TZ` | `UTC` | Your IANA timezone (e.g. `America/New_York`), used to key days the way Garmin does. |
 | `TH_SYNC_INTERVAL_MINUTES` | `180` | How often the background poll syncs. |
-| `TH_DATA_DIR` | `/data` | Where the SQLite file lives (mount a volume to persist it). |
+| `TH_DATA_DIR` | `/data` | Where the SQLite file lives. Under Docker this is fixed to `/data` (the mounted volume); only relevant for non-Docker local runs. |
 | `TH_PORT` | `8000` | Port the app listens on. |
 
 ---

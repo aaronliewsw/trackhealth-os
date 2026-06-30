@@ -5,13 +5,18 @@ services:
     env_file:
       - .env
     environment:
-      TH_DATA_DIR: ${TH_DATA_DIR:-/data}
+      # Internal container path — fixed, not user-tunable. Hardcoded (not ${TH_DATA_DIR})
+      # so a stale shell export can't break the volume mount below, nor silently redirect
+      # writes to an unmounted path (which would lose data on container removal).
+      TH_DATA_DIR: /data
       TH_PORT: 8000
     ports:
       # ADR 0005: bind to localhost so the User supplies the VPN/proxy/Tailscale perimeter.
       - "127.0.0.1:${TH_PORT:-8000}:8000"
     volumes:
-      - trackhealth_data:${TH_DATA_DIR:-/data}
+      # Literal /data — must stay in sync with TH_DATA_DIR above. Never interpolate a
+      # mount path from an env var: a non-absolute value yields an invalid mount spec.
+      - trackhealth_data:/data
 
 volumes:
   trackhealth_data:

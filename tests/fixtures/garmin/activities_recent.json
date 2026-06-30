@@ -1,0 +1,14 @@
+[
+  {
+    "activityType": {
+      "typeKey": "treadmill_running"
+    },
+    "startTimeLocal": "2026-06-30 07:00:00"
+  },
+  {
+    "activityType": {
+      "typeKey": "running"
+    },
+    "startTimeLocal": "2026-06-28 06:30:00"
+  }
+]

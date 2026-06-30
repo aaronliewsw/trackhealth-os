@@ -1,0 +1,35 @@
+{
+  "metric": "hrv",
+  "on": "2026-06-30",
+  "readings": [
+    {
+      "at": "2026-06-30T00:05:00+08:00",
+      "value": 46.0,
+      "detail": {
+        "window": "overnight",
+        "source": "garmin"
+      }
+    },
+    {
+      "at": "2026-06-30T00:10:00+08:00",
+      "value": 52.0,
+      "detail": {
+        "window": "overnight",
+        "source": "garmin"
+      }
+    },
+    {
+      "at": "2026-06-30T00:15:00+08:00",
+      "value": 55.0,
+      "detail": {
+        "window": "overnight",
+        "source": "garmin"
+      }
+    }
+  ],
+  "factors": {
+    "baseline_low": 42,
+    "baseline_high": 68,
+    "status": "balanced"
+  }
+}

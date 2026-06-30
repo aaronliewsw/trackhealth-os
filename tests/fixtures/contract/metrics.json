@@ -1,0 +1,74 @@
+{
+  "metrics": [
+    {
+      "key": "sleep",
+      "label": "Sleep Score",
+      "unit": null,
+      "has_readings": false,
+      "agg": "last"
+    },
+    {
+      "key": "hrv",
+      "label": "HRV",
+      "unit": "ms",
+      "has_readings": true,
+      "agg": "last"
+    },
+    {
+      "key": "resting_hr",
+      "label": "Resting HR",
+      "unit": "bpm",
+      "has_readings": false,
+      "agg": "last"
+    },
+    {
+      "key": "steps",
+      "label": "Steps",
+      "unit": "steps",
+      "has_readings": true,
+      "agg": "sum"
+    },
+    {
+      "key": "stress",
+      "label": "Stress",
+      "unit": null,
+      "has_readings": true,
+      "agg": "last"
+    },
+    {
+      "key": "body_battery",
+      "label": "Body Battery",
+      "unit": null,
+      "has_readings": true,
+      "agg": "last"
+    },
+    {
+      "key": "vo2_max",
+      "label": "VO2 Max",
+      "unit": "ml/kg/min",
+      "has_readings": false,
+      "agg": "last"
+    },
+    {
+      "key": "fitness_age",
+      "label": "Fitness Age",
+      "unit": "yrs",
+      "has_readings": false,
+      "agg": "last"
+    },
+    {
+      "key": "training_readiness",
+      "label": "Training Readiness",
+      "unit": null,
+      "has_readings": false,
+      "agg": "last"
+    },
+    {
+      "key": "running",
+      "label": "Running",
+      "unit": "km",
+      "has_readings": false,
+      "agg": "last"
+    }
+  ]
+}

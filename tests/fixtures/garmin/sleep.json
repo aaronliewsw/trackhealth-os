@@ -1,0 +1,14 @@
+{
+  "dailySleepDTO": {
+    "avgSleepHRV": 58,
+    "sleepEndTimestampLocal": 1782801120000,
+    "sleepScores": {
+      "overall": {
+        "qualifierKey": "GOOD",
+        "value": 84
+      }
+    },
+    "sleepStartTimestampLocal": 1782774480000,
+    "sleepTimeSeconds": 26640
+  }
+}

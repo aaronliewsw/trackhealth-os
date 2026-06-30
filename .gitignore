@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+*.db
+*.sqlite3
+/data/
+
+.env
+
+web/node_modules/
+web/dist/
+
+.DS_Store
+
+# local git worktrees
+.worktrees/

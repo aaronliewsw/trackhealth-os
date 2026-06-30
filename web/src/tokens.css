@@ -1,0 +1,299 @@
+/* ============================================================
+   TrackHealth OS — design tokens
+   color + type + spacing foundations
+   ------------------------------------------------------------
+   A precise, near-greyscale "instrument panel" aesthetic.
+   Swiss/Japanese editorial restraint, one warm accent
+   (vermillion). Light mode is canonical.
+   Font: Geist (Regular 400 + Medium 500). 4px spacing grid.
+   ============================================================ */
+
+/* Geist — self-hosted from /fonts. */
+@font-face {
+  font-family: 'Geist';
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Geist-Light.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Geist-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Geist-Medium.woff2') format('woff2');
+}
+/* 600 emphasis falls back to Medium (500) — no heavier file provided */
+@font-face {
+  font-family: 'Geist';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/Geist-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
+}
+
+:root {
+  /* ---------- NAMED BRAND PALETTE (official, user-supplied) ----------
+     These are the canonical named tokens. Semantic vars below alias them. */
+  --cinnabar:         #DA4B34; /* poster red — runner-up accent */
+  --tomato:           #F95837; /* THE accent (vermillion) */
+  --burnt-tangerine:  #D63A26; /* flattened orb vermillion */
+  --onyx:             #121212; /* alt near-black */
+  --grey:             #7B7B7B; /* secondary text */
+  --alabaster-grey:   #E5E5E5; /* hairline / dividers */
+  --platinum:         #F1F1F1; /* surface */
+  --white:            #FDFDFD; /* backdrop */
+  --onyx-2:           #10110D; /* ink — text + structural lines */
+  --true-cobalt:      #12308A; /* secondary mood accent */
+
+  /* ---------- CORE PALETTE (semantic — ✦ = locked 2026-06-03) ---------- */
+  --backdrop:   var(--white);          /* ✦ base background ("the white") */
+  --surface:    var(--platinum);       /*   panels, cards (sit on the backdrop) */
+  --surface-2:  #F7F7F7;               /*   raised/hover surface, subtle step */
+  --ink:        var(--onyx-2);         /* ✦ ONE ink — body text, primary marks, structural lines */
+  --secondary:  var(--grey);           /*   muted text, labels */
+  --hairline:   var(--alabaster-grey); /*   row dividers + chart axis gridlines (light) */
+
+  /* ---------- ACCENT ---------- */
+  --accent:        var(--tomato);    /* ✦ vermillion — CTAs, highlights, key data, loss/alert */
+  --accent-hover:  var(--burnt-tangerine); /* pressed/hover (deeper vermillion) */
+  --accent-soft:   #FDE7E1;          /*   tint wash behind accent chips / selected days */
+  --accent-ink:    #FFFFFF;          /*   text on accent fills */
+
+  /* Optional secondary accent (cobalt) — use sparingly, mood only */
+  --cobalt:        var(--true-cobalt);
+
+  /* ---------- SEMANTIC DATA COLORS ---------- */
+  --positive:      #119E66; /* profit / gains / wins (green) */
+  --positive-soft: #E4F3EC;
+  --negative:      #F95837; /* loss / drawdown — shares the vermillion accent */
+  --negative-soft: #FDE7E1;
+  --neutral-data:  #10110D; /* zero / neutral values use ink */
+
+  /* Risk levels */
+  --risk-low:    #119E66;
+  --risk-medium: #E6A835;
+  --risk-high:   #F95837;
+
+  /* Chart series (multi-line equity chart) */
+  --series-equity:        #12308A; /* equity line (true cobalt — brand secondary) */
+  --series-profit-target: #119E66; /* profit target (green) */
+  --series-daily-dd:      #E0A020; /* daily drawdown (amber, dashed) */
+  --series-max-dd:        #F95837; /* max drawdown (vermillion) */
+
+  /* ---------- ORB GRADIENT (hero / mood) ----------
+     Build recipe: linear #F9A880 → #F95837, progressive blur, fine noise.
+     Use as a single large soft radial orb on a quiet ground. */
+  --orb-light: #F9A880; /* light peach */
+  --orb-deep:  #F95837; /* vermillion */
+  --orb: radial-gradient(circle at 50% 45%,
+            var(--orb-deep) 0%,
+            var(--orb-light) 42%,
+            rgba(249,168,128,0) 72%);
+  /* Secondary mood orb — true cobalt on a quiet ground (use sparingly) */
+  --orb-cobalt: radial-gradient(circle at 50% 45%,
+            #12308A 0%,
+            #4F6BC4 44%,
+            rgba(79,107,196,0) 72%); /* @kind color */
+
+  /* ============================================================
+     TYPOGRAPHY
+     Geist only — Regular (400) + Medium (500). 600 for rare emphasis.
+     Scale: Body 13 · Title 20 · h2 40. Tracking tightens as size grows.
+     ============================================================ */
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semi:    600;
+
+  /* Type scale (px) */
+  --text-micro:   11px; /* tiny meta, axis labels */
+  --text-label:   13px; /* eyebrows / labels (uppercase) */
+  --text-body:    13px; /* canonical body */
+  --text-sm:      14px;
+  --text-title:   20px; /* panel / section titles */
+  --text-lg:      28px; /* large KPI numbers */
+  --text-h2:      40px; /* page headings */
+  --text-display: 56px; /* hero numbers (day-popup net P&L) */
+
+  /* Line-heights */
+  --leading-tight: 1.05;
+  --leading-snug:  1.25;
+  --leading-body:  1.5;
+
+  /* Letter-spacing (tighten as size grows; widen small caps labels) */
+  --tracking-label:   0.06em;  /* uppercase labels — Swiss, airy */
+  --tracking-body:    0.01em;  /* ~1% */
+  --tracking-title:   0.005em;
+  --tracking-display: -0.01em; /* large display tightens negative */
+
+  /* ============================================================
+     SPACING — strict 4px grid, no exceptions
+     ============================================================ */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ============================================================
+     RADII — restrained. Cards small, controls soft, pills full.
+     ============================================================ */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius:      8px;  /* default card / button */
+  --radius-lg:   12px; /* large panels / modal */
+  --radius-pill: 999px;
+
+  /* ============================================================
+     LINES — two tiers (the system's signature)
+     ============================================================ */
+  --line-bold:  1.5px solid var(--ink);      /* structural / section / table rules */
+  --line-hair:  1px solid var(--hairline);   /* chart gridlines + subtle dividers */
+
+  /* ============================================================
+     SHADOWS — used very sparingly. Mostly flat + hairlines.
+     Reserve elevation for overlays (modal, dropdown).
+     ============================================================ */
+  --shadow-none: none;
+  --shadow-pop:  0 1px 2px rgba(16,17,13,0.04), 0 8px 24px rgba(16,17,13,0.08);
+  --shadow-modal: 0 24px 64px rgba(16,17,13,0.18);
+
+  /* ============================================================
+     MOTION — quiet, precise. Fades + small slides. No bounce.
+     ============================================================ */
+  --ease: cubic-bezier(0.2, 0, 0, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur:      180ms; /* @kind other */
+  --dur-slow: 280ms; /* @kind other */
+
+  --icon-size: 20px;     /* CentralIcons → Lucide, 20px */
+  --icon-stroke: 1.5px;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT DEFAULTS
+   Apply these classes/elements for instant on-brand text.
+   ============================================================ */
+
+body {
+  background: var(--backdrop);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, .h1 {
+  font-size: var(--text-h2);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+  margin: 0;
+}
+
+h2, .title {
+  font-size: var(--text-title);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-title);
+  color: var(--ink);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--secondary);
+  letter-spacing: var(--tracking-body);
+}
+
+/* Eyebrow / label — uppercase, airy, secondary */
+.label,
+.eyebrow {
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--secondary);
+}
+
+p, .body {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink);
+}
+
+.muted { color: var(--secondary); }
+
+/* Numeric / tabular data — monospace tabular figures for alignment */
+.data, .mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0;
+}
+
+.data-xl {
+  font-family: var(--font-mono);
+  font-size: var(--text-display);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  font-feature-settings: 'tnum' 1;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+}
+
+.pos { color: var(--positive); }
+.neg { color: var(--negative); }
+.accent { color: var(--accent); }

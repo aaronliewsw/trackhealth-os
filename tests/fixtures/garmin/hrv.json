@@ -1,0 +1,12 @@
+{
+  "hrvSummary": {
+    "baseline": {
+      "balancedLow": 42,
+      "balancedUpper": 68
+    },
+    "feedbackPhrase": "Within baseline",
+    "lastNightAvg": 55,
+    "status": "BALANCED",
+    "weeklyAvg": 53
+  }
+}

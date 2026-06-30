@@ -1,0 +1,23 @@
+[
+  {
+    "activityType": {
+      "typeKey": "running"
+    },
+    "distance": 10000.0,
+    "startTimeLocal": "2026-06-29 06:30:00"
+  },
+  {
+    "activityType": {
+      "typeKey": "trail_running"
+    },
+    "distance": 18600.0,
+    "startTimeLocal": "2026-06-30 06:10:00"
+  },
+  {
+    "activityType": {
+      "typeKey": "walking"
+    },
+    "distance": 9999.0,
+    "startTimeLocal": "2026-06-30 18:30:00"
+  }
+]

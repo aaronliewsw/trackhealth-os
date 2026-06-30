@@ -1,0 +1,116 @@
+{
+  "date": "2026-06-30",
+  "metrics": {
+    "sleep": {
+      "value": {
+        "score": 84,
+        "score_label": "Good",
+        "hours": 7.4,
+        "duration_str": "7h 24m",
+        "hrv_overnight": 58,
+        "start_local": "2026-06-29T23:08:00",
+        "end_local": "2026-06-30T06:32:00",
+        "in_bed_before_midnight": true
+      },
+      "label": "Sleep Score",
+      "unit": null,
+      "has_readings": false
+    },
+    "hrv": {
+      "value": {
+        "last_night_avg": 55,
+        "weekly_avg": 53,
+        "status": "balanced",
+        "baseline_low": 42,
+        "baseline_high": 68,
+        "feedback": "Within baseline"
+      },
+      "label": "HRV",
+      "unit": "ms",
+      "has_readings": true
+    },
+    "resting_hr": {
+      "value": {
+        "bpm": 51
+      },
+      "label": "Resting HR",
+      "unit": "bpm",
+      "has_readings": false
+    },
+    "steps": {
+      "value": {
+        "total": 9250
+      },
+      "label": "Steps",
+      "unit": "steps",
+      "has_readings": true
+    },
+    "stress": {
+      "value": {
+        "avg": 24,
+        "label": "Low"
+      },
+      "label": "Stress",
+      "unit": null,
+      "has_readings": true
+    },
+    "body_battery": {
+      "value": {
+        "high": 89,
+        "low": 38,
+        "most_recent": 72,
+        "charged": 51,
+        "drained": 17
+      },
+      "label": "Body Battery",
+      "unit": null,
+      "has_readings": true
+    },
+    "vo2_max": {
+      "value": {
+        "value": 49.2
+      },
+      "label": "VO2 Max",
+      "unit": "ml/kg/min",
+      "has_readings": false
+    },
+    "fitness_age": {
+      "value": {
+        "fitness_age": 34.5,
+        "chronological_age": 38,
+        "achievable": 32.0
+      },
+      "label": "Fitness Age",
+      "unit": "yrs",
+      "has_readings": false
+    },
+    "training_readiness": {
+      "value": {
+        "score": 72,
+        "level": "Moderate",
+        "feedback": "Good day for steady aerobic work"
+      },
+      "label": "Training Readiness",
+      "unit": null,
+      "has_readings": false
+    },
+    "running": {
+      "value": {
+        "km": 28.6,
+        "runs": 4,
+        "week_start": "2026-06-29",
+        "week_end": "2026-07-05"
+      },
+      "label": "Running",
+      "unit": "km",
+      "has_readings": false
+    }
+  },
+  "freshness": {
+    "last_success_at": "2026-06-30T06:45:00+08:00",
+    "next_scheduled_at": "2026-06-30T18:45:00+08:00"
+  },
+  "connection": {
+    "state": "connected"
+  }
+}

@@ -56,7 +56,6 @@ def test_engine_backfill_idempotent_join_for_concurrent_callers() -> None:
     store = MemoryStore(token="stored-token")
     started = threading.Event()
     release = threading.Event()
-    start_barrier = threading.Barrier(3)
     calls: list[tuple[str | None, str, int]] = []
 
     def resume(token: str) -> object:
@@ -91,15 +90,21 @@ def test_engine_backfill_idempotent_join_for_concurrent_callers() -> None:
         tz="America/New_York",
     )
 
-    def trigger() -> object:
-        start_barrier.wait(timeout=2)
-        return engine.backfill()
-
     with ThreadPoolExecutor(max_workers=2) as executor:
-        first = executor.submit(trigger)
-        second = executor.submit(trigger)
-        start_barrier.wait(timeout=2)
+        first = executor.submit(engine.backfill)
         assert started.wait(timeout=2)
+        inflight = engine._backfill_inflight
+        assert inflight is not None
+        joined = threading.Event()
+        original_result = inflight.result
+
+        def _result_signalling_join(*args: Any, **kwargs: Any) -> object:
+            joined.set()
+            return original_result(*args, **kwargs)
+
+        inflight.result = _result_signalling_join
+        second = executor.submit(engine.backfill)
+        assert joined.wait(timeout=2)
         release.set()
         first_outcome = first.result(timeout=2)
         second_outcome = second.result(timeout=2)

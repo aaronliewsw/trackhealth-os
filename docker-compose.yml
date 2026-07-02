@@ -2,6 +2,8 @@ services:
   app:
     build:
       context: .
+    # Auto-restart across reboots / Docker restarts (stays down only if you explicitly stop it).
+    restart: unless-stopped
     env_file:
       - .env
     environment:

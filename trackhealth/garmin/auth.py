@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -283,7 +284,11 @@ def _error_mentions_auth_expiry(exc: BaseException) -> bool:
             continue
         seen.add(id(current))
         text = str(current)
-        if isinstance(current, auth_error) or "401" in text or "invalid_grant" in text:
+        if (
+            isinstance(current, auth_error)
+            or re.search(r"\b401\b", text) is not None
+            or "invalid_grant" in text
+        ):
             return True
         cause = current.__cause__
         context = current.__context__

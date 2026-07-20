@@ -303,6 +303,41 @@ def test_sync_persists_rotated_token_once() -> None:
     assert [batch.token for batch in token_writes] == ["rotated-token"]
 
 
+def test_sync_tail_write_supersedes_pull_token_write() -> None:
+    store = MemoryStore(token="stored-token")
+
+    def resume_rotated(token: str) -> StubGarminClient:
+        _ = token
+        return StubGarminClient(garth=StubGarth(dumped="rotated-token"))
+
+    def run_pull(
+        client: Any,
+        store: MemoryStore,
+        *,
+        token: str | None = None,
+        tz: str = "UTC",
+    ) -> PullOutcome:
+        _ = client, tz
+        batch = SyncBatch(snapshots=[], token=token)
+        store.write(batch)
+        return PullOutcome(batch=batch, errors=())
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_rotated,
+        run_pull=run_pull,
+    )
+
+    outcome = engine.trigger_sync()
+    token_writes = [batch for batch in store.writes if batch.token is not None]
+
+    assert outcome.state == "idle"
+    assert store.load_token() == "rotated-token"
+    assert [batch.token for batch in token_writes] == ["stored-token", "rotated-token"]
+    assert token_writes[-1].token == "rotated-token"
+
+
 def test_sync_skips_token_write_when_dump_is_unchanged() -> None:
     store = MemoryStore(token="stored-token")
 
@@ -320,11 +355,34 @@ def test_sync_skips_token_write_when_dump_is_unchanged() -> None:
     outcome = engine.trigger_sync()
 
     assert outcome.state == "idle"
+    assert outcome.errors == []
     assert store.load_token() == "stored-token"
     assert store.writes == []
 
 
-def test_sync_ignores_token_dump_failure() -> None:
+def test_sync_skips_token_write_when_dump_is_empty() -> None:
+    store = MemoryStore(token="stored-token")
+
+    def resume_empty(token: str) -> StubGarminClient:
+        _ = token
+        return StubGarminClient(garth=StubGarth(dumped=""))
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_empty,
+        run_pull=pull_success,
+    )
+
+    outcome = engine.trigger_sync()
+
+    assert outcome.state == "idle"
+    assert outcome.errors == []
+    assert store.load_token() == "stored-token"
+    assert store.writes == []
+
+
+def test_sync_skips_token_dump_for_client_without_garth_accessor() -> None:
     store = MemoryStore(token="stored-token")
     engine = SyncEngine(
         store,
@@ -337,6 +395,124 @@ def test_sync_ignores_token_dump_failure() -> None:
 
     assert outcome.state == "idle"
     assert outcome.errors == []
+    assert store.load_token() == "stored-token"
+    assert store.writes == []
+
+
+def test_sync_surfaces_non_fatal_note_when_token_dump_fails() -> None:
+    @dataclass(frozen=True)
+    class FailingGarth:
+        def loads(self, token: str) -> None:
+            _ = token
+
+        def dumps(self) -> str:
+            raise ValueError("could not serialize token")
+
+    @dataclass(frozen=True)
+    class FailingGarminClient:
+        garth: FailingGarth
+
+    store = MemoryStore(token="stored-token")
+
+    def resume_with_failing_dump(token: str) -> FailingGarminClient:
+        _ = token
+        return FailingGarminClient(garth=FailingGarth())
+
+    def run_pull(
+        client: Any,
+        store: MemoryStore,
+        *,
+        token: str | None = None,
+        tz: str = "UTC",
+    ) -> PullOutcome:
+        _ = client, store, tz
+        return PullOutcome(
+            batch=SyncBatch(snapshots=[], token=token),
+            errors=("existing pull note",),
+        )
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_with_failing_dump,
+        run_pull=run_pull,
+    )
+
+    outcome = engine.trigger_sync()
+
+    assert outcome.state == "idle"
+    assert outcome.errors == [
+        "existing pull note",
+        "Sync succeeded, but the refreshed Garmin token could not be saved. "
+        "If reconnect prompts recur, report this.",
+    ]
+    assert store.load_token() == "stored-token"
+    assert store.writes == []
+
+
+def test_sync_surfaces_non_fatal_note_when_garth_dump_accessor_is_missing() -> None:
+    @dataclass(frozen=True)
+    class MissingDumpsGarth:
+        def loads(self, token: str) -> None:
+            _ = token
+
+    @dataclass(frozen=True)
+    class MissingDumpsGarminClient:
+        garth: MissingDumpsGarth
+
+    store = MemoryStore(token="stored-token")
+
+    def resume_without_dumps(token: str) -> MissingDumpsGarminClient:
+        _ = token
+        return MissingDumpsGarminClient(garth=MissingDumpsGarth())
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_without_dumps,
+        run_pull=pull_success,
+    )
+
+    outcome = engine.trigger_sync()
+
+    assert outcome.state == "idle"
+    assert outcome.errors == [
+        "Sync succeeded, but the refreshed Garmin token could not be saved. "
+        "If reconnect prompts recur, report this."
+    ]
+    assert store.load_token() == "stored-token"
+    assert store.writes == []
+
+
+def test_sync_surfaces_non_fatal_note_when_token_write_fails() -> None:
+    class TokenWriteFailingStore(MemoryStore):
+        def write(self, batch: SyncBatch) -> None:
+            if batch.token == "rotated-token":
+                raise OSError("disk is full")
+            super().write(batch)
+
+    store = TokenWriteFailingStore(token="stored-token")
+
+    def resume_rotated(token: str) -> StubGarminClient:
+        _ = token
+        return StubGarminClient(garth=StubGarth(dumped="rotated-token"))
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_rotated,
+        run_pull=pull_success,
+    )
+
+    outcome = engine.trigger_sync()
+
+    assert outcome.state == "idle"
+    assert outcome.errors == [
+        "Sync succeeded, but the refreshed Garmin token could not be saved. "
+        "If reconnect prompts recur, report this."
+    ]
+    assert outcome.last_success_at is not None
+    assert engine.status()["last_success_at"] == outcome.last_success_at
     assert store.load_token() == "stored-token"
     assert store.writes == []
 
@@ -375,6 +551,58 @@ def test_backfill_persists_rotated_token_once() -> None:
     assert [batch.token for batch in token_writes] == ["rotated-token"]
 
 
+def test_backfill_appends_non_fatal_note_when_token_dump_fails() -> None:
+    @dataclass(frozen=True)
+    class FailingGarth:
+        def loads(self, token: str) -> None:
+            _ = token
+
+        def dumps(self) -> str:
+            raise ValueError("could not serialize token")
+
+    @dataclass(frozen=True)
+    class FailingGarminClient:
+        garth: FailingGarth
+
+    store = MemoryStore(token="stored-token")
+
+    def resume_with_failing_dump(token: str) -> FailingGarminClient:
+        _ = token
+        return FailingGarminClient(garth=FailingGarth())
+
+    def run_backfill(
+        client: Any,
+        store: MemoryStore,
+        *,
+        days: int = 28,
+        tz: str = "UTC",
+    ) -> BackfillOutcome:
+        _ = client, store, days, tz
+        return BackfillOutcome(days_written=2, errors=("existing backfill note",))
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_with_failing_dump,
+        run_pull=pull_success,
+        run_backfill=run_backfill,
+    )
+
+    outcome = engine.backfill(days=2)
+
+    assert outcome.state == "idle"
+    assert outcome.days_written == 2
+    assert outcome.last_success_at is not None
+    assert engine.status()["last_success_at"] == outcome.last_success_at
+    assert outcome.errors == [
+        "existing backfill note",
+        "Sync succeeded, but the refreshed Garmin token could not be saved. "
+        "If reconnect prompts recur, report this.",
+    ]
+    assert store.load_token() == "stored-token"
+    assert store.writes == []
+
+
 def test_sync_surfaces_expired_session() -> None:
     store = MemoryStore(token="stored-token")
 
@@ -399,6 +627,28 @@ def test_sync_surfaces_expired_session() -> None:
     assert engine.connection_state() == "expired"
 
 
+def test_sync_expiry_from_replaced_token_does_not_expire_connection() -> None:
+    store = MemoryStore(token="stored-token")
+
+    def resume_expired_after_reconnect(token: str) -> object:
+        _ = token
+        store.write(SyncBatch(snapshots=[], token="replacement-token"))
+        raise GarminSessionExpired()
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_expired_after_reconnect,
+        run_pull=pull_success,
+    )
+
+    outcome = engine.trigger_sync()
+
+    assert outcome.state == "error"
+    assert store.load_token() == "replacement-token"
+    assert engine.connection_state() == "connected"
+
+
 def test_backfill_surfaces_expired_session() -> None:
     store = MemoryStore(token="stored-token")
 
@@ -420,8 +670,30 @@ def test_backfill_surfaces_expired_session() -> None:
     assert outcome.errors == [
         "Garmin session expired. Reconnect your Garmin account to resume syncing."
     ]
-    assert engine.status()["state"] == "error"
+    assert engine.status()["state"] == "idle"
     assert engine.connection_state() == "expired"
+
+
+def test_backfill_expiry_from_replaced_token_does_not_expire_connection() -> None:
+    store = MemoryStore(token="stored-token")
+
+    def resume_expired_after_reconnect(token: str) -> object:
+        _ = token
+        store.write(SyncBatch(snapshots=[], token="replacement-token"))
+        raise GarminSessionExpired()
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_expired_after_reconnect,
+        run_pull=pull_success,
+    )
+
+    outcome = engine.backfill()
+
+    assert outcome.state == "error"
+    assert store.load_token() == "replacement-token"
+    assert engine.connection_state() == "connected"
 
 
 def test_successful_sync_clears_expired_session_state() -> None:
@@ -477,14 +749,18 @@ def test_successful_backfill_clears_expired_session_state() -> None:
         run_pull=pull_success,
         run_backfill=run_backfill,
     )
+    assert engine.status()["state"] == "idle"
+
     engine.backfill()
     assert engine.connection_state() == "expired"
+    assert engine.status()["state"] == "idle"
 
     session_expired = False
     outcome = engine.backfill()
 
     assert outcome.state == "idle"
     assert engine.connection_state() == "connected"
+    assert engine.status()["state"] == "idle"
 
 
 def test_login_clears_expired_session_state() -> None:
@@ -551,3 +827,24 @@ def test_trigger_sync_still_propagates_rate_limit_cooldown() -> None:
         engine.trigger_sync()
 
     assert exc_info.value.remaining_seconds == 60
+
+
+def test_backfill_still_propagates_rate_limit_cooldown() -> None:
+    store = MemoryStore(token="stored-token")
+
+    def resume_rate_limited(token: str) -> object:
+        _ = token
+        raise GarminRateLimitCooldown(60)
+
+    engine = SyncEngine(
+        store,
+        connect=connect_stub,
+        resume=resume_rate_limited,
+        run_pull=pull_success,
+    )
+
+    with pytest.raises(GarminRateLimitCooldown) as exc_info:
+        engine.backfill()
+
+    assert exc_info.value.remaining_seconds == 60
+    assert store.writes == []

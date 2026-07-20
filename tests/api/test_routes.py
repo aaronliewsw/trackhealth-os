@@ -21,6 +21,7 @@ from trackhealth.api.schemas import (
 )
 from trackhealth.config import Settings
 from trackhealth.crypto import generate_key
+from trackhealth.garmin.auth import GarminSessionExpired
 from trackhealth.garmin.pull import PullOutcome
 from trackhealth.metrics.registry import (
     REGISTRY,
@@ -285,6 +286,46 @@ def test_get_state_carries_expired_connection_state(tmp_path: Path) -> None:
     assert response.status_code == 200
     state = StateResponse.model_validate(response.json())
     assert state.connection.state == "expired"
+
+
+def test_sync_expired_session_updates_connection_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enc_key = generate_key()
+    monkeypatch.setenv("TH_ENC_KEY", enc_key)
+    store = SqliteStore(str(tmp_path / "trackhealth.sqlite"))
+    store.write(SyncBatch(snapshots=[], token="stored-token"))
+
+    def resume_expired(token: str) -> object:
+        _ = token
+        raise GarminSessionExpired()
+
+    engine = SyncEngine(store, resume=resume_expired)
+    app = create_app(
+        settings=Settings(
+            data_dir=tmp_path,
+            enc_key=enc_key,
+            tz="UTC",
+            web_dist=tmp_path / "missing-web",
+        ),
+        store=store,
+        engine=engine,
+        enable_scheduler=False,
+    )
+
+    with TestClient(app) as client:
+        sync_response = client.post("/api/sync")
+        connection_response = client.get("/api/connection")
+
+    assert sync_response.status_code == 200
+    assert sync_response.json() == {
+        "state": "error",
+        "last_success_at": None,
+        "error": "Garmin session expired. Reconnect your Garmin account to resume syncing.",
+    }
+    assert connection_response.status_code == 200
+    assert connection_response.json() == {"state": "expired"}
 
 
 def _connect_and_sync(client: TestClient) -> None:

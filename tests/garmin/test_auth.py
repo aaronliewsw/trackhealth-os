@@ -217,6 +217,53 @@ def test_resume_wraps_401_connection_error_as_expired_session(
     )
 
 
+def test_resume_wraps_401_cause_as_expired_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    cause = fake_garmin.connection_error("HTTP error: API Error 401 - ")
+    failure = fake_garmin.connection_error("Failed to retrieve social profile")
+    failure.__cause__ = cause
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = failure
+
+    with pytest.raises(auth.GarminSessionExpired):
+        auth.resume('{"di_token":"existing"}')
+
+    assert fake_garmin.instances[0].paths == [auth.SOCIAL_PROFILE_PATH]
+
+
+def test_resume_429_cause_takes_precedence_over_auth_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    cause = fake_garmin.connection_error("API Error 429 - rate limited")
+    failure = fake_garmin.auth_error("Failed to retrieve social profile")
+    failure.__cause__ = cause
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = failure
+
+    with pytest.raises(auth.GarminRateLimitCooldown) as exc_info:
+        auth.resume('{"di_token":"existing"}')
+
+    assert exc_info.value.remaining_seconds == auth.COOLDOWN_SECONDS
+
+
+def test_resume_does_not_treat_embedded_401_digits_as_expired_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    failure = fake_garmin.connection_error(
+        "trace abc401def sent 14010 bytes to port 14010"
+    )
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = failure
+
+    with pytest.raises(fake_garmin.connection_error) as exc_info:
+        auth.resume('{"di_token":"existing"}')
+
+    assert exc_info.value is failure
+    assert fake_garmin.instances[0].paths == [auth.SOCIAL_PROFILE_PATH] * 3
+
+
 def test_resume_wraps_invalid_grant_as_expired_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

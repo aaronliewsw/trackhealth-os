@@ -13,6 +13,11 @@ from trackhealth.garmin import auth, pull
 from trackhealth.garmin.auth import GarminRateLimitCooldown, GarminSessionExpired
 from trackhealth.store.interface import Store, SyncBatch
 
+_TOKEN_PERSISTENCE_NOTE = (
+    "Sync succeeded, but the refreshed Garmin token could not be saved. "
+    "If reconnect prompts recur, report this."
+)
+
 
 @dataclass(frozen=True)
 class SyncOutcome:
@@ -182,13 +187,26 @@ class SyncEngine:
             if self._state != "syncing":
                 self._state = "idle"
 
-    def _persist_rotated_token(self, client: Any, previous: str) -> None:
+    def _persist_rotated_token(self, client: Any, previous: str) -> list[str]:
         try:
+            for attr in ("client", "garth"):
+                accessor = getattr(client, attr, None)
+                if accessor is not None and (
+                    hasattr(accessor, "loads") or hasattr(accessor, "dumps")
+                ):
+                    break
+            else:
+                return []
+
             dumped = auth.dump_token(client)
         except Exception:
-            return
+            return [_TOKEN_PERSISTENCE_NOTE]
         if dumped and dumped != previous:
-            self._store.write(SyncBatch(snapshots=[], token=dumped))
+            try:
+                self._store.write(SyncBatch(snapshots=[], token=dumped))
+            except Exception:
+                return [_TOKEN_PERSISTENCE_NOTE]
+        return []
 
     def _run_sync(self, trigger: str) -> SyncOutcome:
         _ = trigger
@@ -203,12 +221,13 @@ class SyncEngine:
             client = self._resume(token)
             pull_outcome = self._run_pull(client, self._store, token=token, tz=self._tz)
             # This tail write supersedes the original token embedded by pull after rotation.
-            self._persist_rotated_token(client, token)
+            token_notes = self._persist_rotated_token(client, token)
         except (MissingEncryptionKey, GarminRateLimitCooldown):
             raise
         except GarminSessionExpired as exc:
             with self._lock:
-                self._auth_expired = True
+                if self._store.load_token() == token:
+                    self._auth_expired = True
                 self._state = "error"
                 last_success_at = self._last_success_at
             return SyncOutcome(
@@ -227,7 +246,7 @@ class SyncEngine:
             )
 
         last_success_at = datetime.now(UTC)
-        errors = list(getattr(pull_outcome, "errors", ()))
+        errors = list(getattr(pull_outcome, "errors", ())) + token_notes
         with self._lock:
             self._auth_expired = False
             self._state = "idle"
@@ -252,13 +271,13 @@ class SyncEngine:
                 days=days,
                 tz=self._tz,
             )
-            self._persist_rotated_token(client, token)
+            token_notes = self._persist_rotated_token(client, token)
         except (MissingEncryptionKey, GarminRateLimitCooldown):
             raise
         except GarminSessionExpired as exc:
             with self._lock:
-                self._auth_expired = True
-                self._state = "error"
+                if self._store.load_token() == token:
+                    self._auth_expired = True
                 last_success_at = self._last_success_at
             return BackfillSyncOutcome(
                 state="error",
@@ -277,7 +296,7 @@ class SyncEngine:
             )
 
         last_success_at = datetime.now(UTC)
-        errors = list(getattr(backfill_outcome, "errors", ()))
+        errors = list(getattr(backfill_outcome, "errors", ())) + token_notes
         days_written = int(getattr(backfill_outcome, "days_written", 0))
         with self._lock:
             self._auth_expired = False

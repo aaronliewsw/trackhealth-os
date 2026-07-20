@@ -501,6 +501,17 @@ export function App() {
     return () => controller.abort();
   }, [refreshState]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshStateWithBanner("State did not refresh after returning to the dashboard.");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [refreshStateWithBanner]);
+
   const handleSyncNow = async () => {
     setIsSyncing(true);
     showStatusBanner("loading", "Syncing now\u2026");

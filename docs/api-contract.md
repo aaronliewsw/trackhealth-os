@@ -31,7 +31,7 @@ Response:
 }
 ```
 
-`connection.state` is one of `connected`, `disconnected`, or `needs_mfa`.
+`connection.state` is one of `connected | disconnected | needs_mfa | expired`.
 
 ## GET /api/metrics/{metric}/series
 
@@ -136,3 +136,5 @@ Response:
   "state": "connected"
 }
 ```
+
+`connection.state` is one of `connected | disconnected | needs_mfa | expired`.

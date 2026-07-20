@@ -78,7 +78,9 @@ def get_state(request: Request) -> StateResponse:
 
     try:
         connection = ConnectionResponse(
-            state=cast(Literal["connected", "disconnected"], engine.connection_state())
+            state=cast(
+                Literal["connected", "disconnected", "expired"], engine.connection_state()
+            )
         )
     except (MissingEncryptionKey, GarminProfileUnavailable, GarminRateLimitCooldown) as exc:
         _raise_http(exc)
@@ -181,7 +183,9 @@ def get_connection(request: Request) -> ConnectionResponse:
         state = _engine(request).connection_state()
     except (MissingEncryptionKey, GarminRateLimitCooldown) as exc:
         _raise_http(exc)
-    return ConnectionResponse(state=cast(Literal["connected", "disconnected"], state))
+    return ConnectionResponse(
+        state=cast(Literal["connected", "disconnected", "expired"], state)
+    )
 
 
 @router.post("/connection", response_model=ConnectionResponse)

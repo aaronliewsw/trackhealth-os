@@ -21,7 +21,7 @@ from trackhealth.metrics.registry import (
     Vo2MaxValue,
 )
 
-ConnectionState: TypeAlias = Literal["connected", "disconnected", "needs_mfa"]
+ConnectionState: TypeAlias = Literal["connected", "disconnected", "needs_mfa", "expired"]
 MetricValue: TypeAlias = (
     SleepValue
     | HrvValue

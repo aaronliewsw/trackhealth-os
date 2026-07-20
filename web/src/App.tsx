@@ -264,9 +264,11 @@ function useNow() {
 function ConnectScreen({
   initialNeedsMfa,
   onConnected,
+  reason,
 }: {
   initialNeedsMfa: boolean;
   onConnected: () => Promise<void>;
+  reason: "first_run" | "expired";
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -316,11 +318,14 @@ function ConnectScreen({
     <main className="app-shell">
       <section className="connection-screen" aria-labelledby="connection-title">
         <div className="connection-screen__copy">
-          <p className="eyebrow">First run</p>
-          <h1 id="connection-title">Connect Garmin account</h1>
+          <p className="eyebrow">{reason === "expired" ? "Session expired" : "First run"}</p>
+          <h1 id="connection-title">
+            {reason === "expired" ? "Reconnect Garmin account" : "Connect Garmin account"}
+          </h1>
           <p className="connection-screen__lede">
-            TrackHealth uses this once to create the encrypted Garmin token for this private
-            Instance.
+            {reason === "expired"
+              ? "Your Garmin session expired, so syncing is paused. Sign in again to resume. Your data stays on this Instance."
+              : "TrackHealth uses this once to create the encrypted Garmin token for this private Instance."}
           </p>
         </div>
 
@@ -374,7 +379,13 @@ function ConnectScreen({
           ) : null}
 
           <button className="control-button control-button--primary" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Connecting" : needsMfa ? "Submit code" : "Connect Garmin"}
+            {isSubmitting
+              ? "Connecting"
+              : needsMfa
+                ? "Submit code"
+                : reason === "expired"
+                  ? "Reconnect Garmin"
+                  : "Connect Garmin"}
           </button>
         </form>
       </section>
@@ -595,6 +606,7 @@ export function App() {
       <ConnectScreen
         initialNeedsMfa={state.connection.state === "needs_mfa"}
         onConnected={handleConnected}
+        reason={state.connection.state === "expired" ? "expired" : "first_run"}
       />
     );
   }

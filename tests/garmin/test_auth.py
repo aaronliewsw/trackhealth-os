@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass
 from types import ModuleType
 from typing import Any
 
@@ -197,3 +198,90 @@ def test_login_profile_429_cause_starts_cooldown(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(auth.GarminRateLimitCooldown):
         auth.connect("user@example.test", "password")
+
+
+def test_resume_wraps_401_connection_error_as_expired_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = fake_garmin.connection_error(
+        "HTTP error: API Error 401 - "
+    )
+
+    with pytest.raises(auth.GarminSessionExpired) as exc_info:
+        auth.resume('{"di_token":"existing"}')
+
+    assert str(exc_info.value) == (
+        "Garmin session expired. Reconnect your Garmin account to resume syncing."
+    )
+
+
+def test_resume_wraps_invalid_grant_as_expired_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = fake_garmin.connection_error(
+        "OAuth refresh failed: invalid_grant"
+    )
+
+    with pytest.raises(auth.GarminSessionExpired):
+        auth.resume('{"di_token":"existing"}')
+
+
+def test_resume_does_not_retry_auth_expiry_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = fake_garmin.connection_error(
+        "HTTP error: API Error 401 - "
+    )
+
+    with pytest.raises(auth.GarminSessionExpired):
+        auth.resume('{"di_token":"existing"}')
+
+    assert fake_garmin.instances[0].paths == [auth.SOCIAL_PROFILE_PATH]
+
+
+def test_import_token_wraps_auth_expiry_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    path_exceptions: dict[str, BaseException] = {}
+    fake_garmin = install_fake_garmin(monkeypatch, path_exceptions=path_exceptions)
+    path_exceptions[auth.SOCIAL_PROFILE_PATH] = fake_garmin.auth_error(
+        "Stored credentials rejected"
+    )
+
+    with pytest.raises(auth.GarminSessionExpired):
+        auth.import_token('{"di_token":"existing"}')
+
+
+def test_connect_preserves_original_auth_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_garmin = install_fake_garmin(monkeypatch)
+    failure = fake_garmin.auth_error("Bad credentials")
+    fake_garmin.state["login_exception"] = failure
+
+    with pytest.raises(fake_garmin.auth_error) as exc_info:
+        auth.connect("user@example.test", "wrong-password")
+
+    assert exc_info.value is failure
+
+
+def test_dump_token_serializes_strings_and_dicts() -> None:
+    @dataclass(frozen=True)
+    class StubGarth:
+        dumped: Any
+
+        def loads(self, token: str) -> None:
+            _ = token
+
+        def dumps(self) -> Any:
+            return self.dumped
+
+    @dataclass(frozen=True)
+    class StubClient:
+        garth: StubGarth
+
+    string_client = StubClient(garth=StubGarth(dumped="serialized-token"))
+    dict_client = StubClient(garth=StubGarth(dumped={"z": 1, "a": "token"}))
+
+    assert auth.dump_token(string_client) == "serialized-token"
+    assert auth.dump_token(dict_client) == '{"a":"token","z":1}'

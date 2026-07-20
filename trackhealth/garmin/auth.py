@@ -25,6 +25,15 @@ class GarminProfileUnavailable(RuntimeError):
     """Raised when a restored Garmin session cannot load the profile required by stats."""
 
 
+class GarminSessionExpired(RuntimeError):
+    """Raised when the stored Garmin session can no longer authenticate."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Garmin session expired. Reconnect your Garmin account to resume syncing."
+        )
+
+
 class GarminRateLimitCooldown(RuntimeError):
     """Raised when Garmin returned HTTP 429 or the local cooldown is active."""
 
@@ -75,6 +84,8 @@ def resume(token: str) -> Any:
     except (auth_error, connection_error) as exc:
         if _error_mentions_429(exc):
             raise _record_429() from exc
+        if _error_mentions_auth_expiry(exc):
+            raise GarminSessionExpired() from exc
         raise
     return client
 
@@ -100,6 +111,8 @@ def import_token(token: str) -> str:
     except (auth_error, connection_error) as exc:
         if _error_mentions_429(exc):
             raise _record_429() from exc
+        if _error_mentions_auth_expiry(exc):
+            raise GarminSessionExpired() from exc
         raise
     return _dump_token(client)
 
@@ -148,6 +161,10 @@ def _garth_client(client: Any) -> Any:
         if candidate is not None and hasattr(candidate, "loads"):
             return candidate
     raise RuntimeError("garminconnect client does not expose garth loads()/dumps()")
+
+
+def dump_token(client: Any) -> str:
+    return _dump_token(client)
 
 
 def _dump_token(client: Any) -> str:
@@ -206,7 +223,7 @@ def _fetch_connectapi_dict(
         try:
             data = _connectapi(client, path)
         except Exception as exc:
-            if _error_mentions_429(exc) or attempt == 2:
+            if _error_mentions_429(exc) or _error_mentions_auth_expiry(exc) or attempt == 2:
                 raise
             time.sleep(1)
             continue
@@ -246,6 +263,27 @@ def _error_mentions_429(exc: BaseException) -> bool:
             continue
         seen.add(id(current))
         if "429" in str(current):
+            return True
+        cause = current.__cause__
+        context = current.__context__
+        if cause is not None:
+            pending.append(cause)
+        if context is not None:
+            pending.append(context)
+    return False
+
+
+def _error_mentions_auth_expiry(exc: BaseException) -> bool:
+    _, auth_error, _, _ = _garmin_imports()
+    pending: list[BaseException] = [exc]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        text = str(current)
+        if isinstance(current, auth_error) or "401" in text or "invalid_grant" in text:
             return True
         cause = current.__cause__
         context = current.__context__

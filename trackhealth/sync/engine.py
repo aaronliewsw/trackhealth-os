@@ -10,7 +10,7 @@ from typing import Any, Protocol
 
 from trackhealth.crypto import MissingEncryptionKey
 from trackhealth.garmin import auth, pull
-from trackhealth.garmin.auth import GarminRateLimitCooldown
+from trackhealth.garmin.auth import GarminRateLimitCooldown, GarminSessionExpired
 from trackhealth.store.interface import Store, SyncBatch
 
 
@@ -80,6 +80,7 @@ class SyncEngine:
         self._inflight: Future[SyncOutcome] | None = None
         self._backfill_inflight: Future[BackfillSyncOutcome] | None = None
         self._state = "idle"
+        self._auth_expired = False
         self._last_success_at: datetime | None = None
         self._next_scheduled_at: datetime | None = None
 
@@ -158,19 +159,36 @@ class SyncEngine:
             self._next_scheduled_at = next_scheduled_at
 
     def connection_state(self) -> str:
-        return "connected" if self._store.load_token() else "disconnected"
+        token = self._store.load_token()
+        with self._lock:
+            auth_expired = self._auth_expired
+        # ADR 0007: expiry is in-memory, so restart reports connected until the next sync.
+        if token and auth_expired:
+            return "expired"
+        return "connected" if token else "disconnected"
 
     def login(self, email: str, password: str, mfa_code: str | None = None) -> str:
         token = self._connect(email, password, mfa_code=mfa_code)
         self._store.write(SyncBatch(snapshots=[], token=token))
+        with self._lock:
+            self._auth_expired = False
         return token
 
     def disconnect(self) -> None:
         self._store.clear_token()
         with self._lock:
+            self._auth_expired = False
             self._last_success_at = None
             if self._state != "syncing":
                 self._state = "idle"
+
+    def _persist_rotated_token(self, client: Any, previous: str) -> None:
+        try:
+            dumped = auth.dump_token(client)
+        except Exception:
+            return
+        if dumped and dumped != previous:
+            self._store.write(SyncBatch(snapshots=[], token=dumped))
 
     def _run_sync(self, trigger: str) -> SyncOutcome:
         _ = trigger
@@ -184,8 +202,20 @@ class SyncEngine:
 
             client = self._resume(token)
             pull_outcome = self._run_pull(client, self._store, token=token, tz=self._tz)
+            # This tail write supersedes the original token embedded by pull after rotation.
+            self._persist_rotated_token(client, token)
         except (MissingEncryptionKey, GarminRateLimitCooldown):
             raise
+        except GarminSessionExpired as exc:
+            with self._lock:
+                self._auth_expired = True
+                self._state = "error"
+                last_success_at = self._last_success_at
+            return SyncOutcome(
+                state="error",
+                errors=[str(exc)],
+                last_success_at=last_success_at,
+            )
         except Exception as exc:
             with self._lock:
                 self._state = "error"
@@ -199,6 +229,7 @@ class SyncEngine:
         last_success_at = datetime.now(UTC)
         errors = list(getattr(pull_outcome, "errors", ()))
         with self._lock:
+            self._auth_expired = False
             self._state = "idle"
             self._last_success_at = last_success_at
         return SyncOutcome(state="idle", errors=errors, last_success_at=last_success_at)
@@ -221,8 +252,20 @@ class SyncEngine:
                 days=days,
                 tz=self._tz,
             )
+            self._persist_rotated_token(client, token)
         except (MissingEncryptionKey, GarminRateLimitCooldown):
             raise
+        except GarminSessionExpired as exc:
+            with self._lock:
+                self._auth_expired = True
+                self._state = "error"
+                last_success_at = self._last_success_at
+            return BackfillSyncOutcome(
+                state="error",
+                days_written=0,
+                errors=[str(exc)],
+                last_success_at=last_success_at,
+            )
         except Exception as exc:
             with self._lock:
                 last_success_at = self._last_success_at
@@ -237,6 +280,7 @@ class SyncEngine:
         errors = list(getattr(backfill_outcome, "errors", ()))
         days_written = int(getattr(backfill_outcome, "days_written", 0))
         with self._lock:
+            self._auth_expired = False
             self._last_success_at = last_success_at
         return BackfillSyncOutcome(
             state="idle",

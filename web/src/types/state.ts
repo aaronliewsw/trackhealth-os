@@ -1,6 +1,6 @@
 export type TrendAgg = "last" | "sum";
 
-export type ConnectionStatus = "connected" | "disconnected" | "needs_mfa";
+export type ConnectionStatus = "connected" | "disconnected" | "needs_mfa" | "expired";
 export type SyncState = "idle" | "syncing" | "running" | "error" | "not_connected";
 
 export interface Freshness {

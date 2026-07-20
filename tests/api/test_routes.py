@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,6 +38,15 @@ from trackhealth.metrics.registry import (
 from trackhealth.store.interface import DailySnapshot, Reading, SyncBatch
 from trackhealth.store.sqlite import SqliteStore
 from trackhealth.sync import SyncEngine
+
+
+@dataclass(frozen=True)
+class ExpiredEngine:
+    def connection_state(self) -> str:
+        return "expired"
+
+    def freshness(self) -> dict[str, object]:
+        return {"last_success_at": None, "next_scheduled_at": None}
 
 
 @pytest.fixture
@@ -242,6 +252,39 @@ def test_scheduler_callback_triggers_scheduled_sync_and_updates_next_time() -> N
     assert result == {"state": "idle"}
     assert engine.triggers == ["scheduled"]
     assert engine.next_scheduled_at == now + timedelta(minutes=30)
+
+
+def test_get_connection_returns_expired_state(tmp_path: Path) -> None:
+    store = SqliteStore(str(tmp_path / "trackhealth.sqlite"))
+    app = create_app(
+        settings=Settings(data_dir=tmp_path, tz="UTC", web_dist=tmp_path / "missing-web"),
+        store=store,
+        engine=cast(Any, ExpiredEngine()),
+        enable_scheduler=False,
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/connection")
+
+    assert response.status_code == 200
+    assert response.json() == {"state": "expired"}
+
+
+def test_get_state_carries_expired_connection_state(tmp_path: Path) -> None:
+    store = SqliteStore(str(tmp_path / "trackhealth.sqlite"))
+    app = create_app(
+        settings=Settings(data_dir=tmp_path, tz="UTC", web_dist=tmp_path / "missing-web"),
+        store=store,
+        engine=cast(Any, ExpiredEngine()),
+        enable_scheduler=False,
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/state")
+
+    assert response.status_code == 200
+    state = StateResponse.model_validate(response.json())
+    assert state.connection.state == "expired"
 
 
 def _connect_and_sync(client: TestClient) -> None:
